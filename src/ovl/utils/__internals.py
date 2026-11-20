@@ -1,11 +1,13 @@
 from pathlib import Path
 from re import compile as RegExp
-from typing import Literal, Generator, Any, Iterator #type:ignore
+from typing import Literal, Generator, Any, Iterator, Iterable, Callable #type:ignore
 import os
 # Global Constants ===========|
 ACCEPTED_OVL_SUFFIXES = (".ovl", ".oval", ".oconf", ".ov", ".conf", ".ovlconf")
-META_REGEXP = RegExp(rb"^\w+\]\s[\w]+((?:\.[\w]+)*(\$(?:\.[\w]+)*)?):\s")
- 
+META_REGEXP = RegExp(rb"^\w+\]\s[\w]+(\$[\w]+(?:\.[\w]+)*)?:\s")
+
+type DictLike = dict[str|int, Any]|frozendict[str|int, Any]
+
 # Helper Functions ===========|
 def _ihAssert(path: Path) -> Literal[True]:
     """Asserts the following assumptions of a given file:
@@ -86,3 +88,35 @@ def Eval(library: str|bytes, command: str|bytes, data:bytes) -> Any:
         elif command == b'tsv': return [_.strip().decode('utf-8') for _ in data.split(b'\t') if _]
         else: return [_.strip().decode('utf-8') for _ in data.split(b' ') if _]
     else: return data.decode('utf-8')
+
+def ClassFactory(Root: DictLike= {}):
+    if not isinstance(Root, (dict)): raise TypeError(F"IncorrectDatatype: {type(Root)}") #type:ignore
+    ClassCounterDatabase:DictLike = {} #Intentionally Flat because this is a table.
+    Node = Root
+    _LastClass = ''
+    def _lCounter(_cls: str) -> int:
+        ClassCounterDatabase.setdefault(_cls, -1)
+        ClassCounterDatabase[_cls] += 1
+        return (ClassCounterDatabase[_cls])
+    def _lWalkObject(_cls:Iterable[str|int]) -> DictLike:
+        """Recurses through the local `_Object` to get to a specific node. Returns the last legal node."""
+        nonlocal Node; Node = Root
+        for node in _cls: Node = Node.get(node, Node)
+        else: return Node
+    def _lRegisterSubClass(_cls: str) -> None: 
+        nonlocal _LastClass
+        if _cls == _LastClass: return
+        _ = _cls.split('.')
+        _lWalkObject(_).setdefault(_[-1], DictLike) #type:ignore
+        _LastClass = _cls
+    def _lRegisterItemName(_name: bytes) -> str|int:
+        nonlocal _LastClass; return _lCounter(_LastClass) if _name == b'nil' else _name.decode()
+    def _lConstruct(o: Generator[tuple[bytes, bytes, bytes, bytes]]) -> Literal[True]:
+        nonlocal Node
+        for _type, _name, _class, _data in o:
+            _lRegisterSubClass(_class.decode())
+            _name = _lRegisterItemName(_name)
+            Node[_name] = _data
+        return True
+    return Root, _lConstruct
+        
