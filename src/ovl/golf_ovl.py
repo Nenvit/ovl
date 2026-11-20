@@ -8,18 +8,12 @@ def loads(o:str|pathlib.Path, /, frozen:bool=True) -> frozendict[typing.Any, typ
         else: _ret.update(_ret['']); del _ret[''] #type:ignore
         return frozendict(_ret) if frozen else _ret #type:ignore
 def loadsarray(o:str|pathlib.Path, /, frozen:bool=True) -> tuple[typing.Any]|list[typing.Any]:
-    _iAssertPath(pathlib.Path(o))
-    values:list[typing.Any] = []
+    _iAssertPath(pathlib.Path(o)); values:list[typing.Any] = []
     with open(o, 'r') as SrcFile:
         for line in SrcFile:
-            if line.startswith('...'):
-                continue
-            if RegExp.match(line):
-                metadata, value = line.split(': ', 1)
-                value_type, _ = metadata.split('] ', 1)
-                values.append(_iEval(value_type, value.rstrip()))
-            else:
-                values.append(line.rstrip())
+            if line.startswith('...'): continue
+            if RegExp.match(line): metadata, value = line.split(': ', 1); value_type, _ = metadata.split('] ', 1); values.append(_iEval(value_type, value.rstrip()))
+            else: values.append(line.rstrip())
     return tuple(values) if frozen else values
 def _iEval(_type: str, _line: str) -> typing.Any:
     match(_type):
