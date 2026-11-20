@@ -1,13 +1,7 @@
-#!/usr/bin/env python3
-# Global Imports ============|
 from pathlib import Path
 from re import compile as RegExp
-from typing import Any, Literal, Generator, Iterator
+from typing import Literal, Generator, Any, Iterator #type:ignore
 import os
-
-# Exports ===================|
-__all__ = ["loads", "loadsarray", "loadsiter"]
-
 # Global Constants ===========|
 ACCEPTED_OVL_SUFFIXES = (".ovl", ".oval", ".oconf", ".ov", ".conf", ".ovlconf")
 META_REGEXP = RegExp(rb"^\w+\]\s[\w]+((?:\.[\w]+)*(\$(?:\.[\w]+)*)?):\s")
@@ -50,12 +44,12 @@ def _ihMeta(stream:Generator[bytes], /) -> Generator[tuple[bytes, bytes, bytes, 
         yield _type, _name, _class, _blob
         
 # Internal Functions =========|
-def _iChain(o: str|Path) -> Generator[tuple[bytes, bytes, bytes, bytes]]:
+def InternalPlumbing(o: str|Path) -> Generator[tuple[bytes, bytes, bytes, bytes]]:
     SourceGenerator = _ihGenerateSrc(Path(o))
     BlobGenerator   = _ihBlobber(SourceGenerator)
     return _ihMeta(BlobGenerator)
 
-def _iTypeLibraryDispatch(o:bytes, /) -> tuple[str|bytes, str|bytes]:
+def TypeLibraryDispatch(o:bytes, /) -> tuple[str|bytes, str|bytes]:
     """Maps the object type to a standard library, and the method used."""
     o = o.lower()
     match(o):
@@ -80,7 +74,7 @@ def _iTypeLibraryDispatch(o:bytes, /) -> tuple[str|bytes, str|bytes]:
         case b'toml': return 'tomllib', b'tomllib.parse(%b)'
         case _: return '', ''
 
-def _iEval(library: str|bytes, command: str|bytes, data:bytes) -> Any:
+def Eval(library: str|bytes, command: str|bytes, data:bytes) -> Any:
     if library and isinstance(library, str): 
         __import__(library)
         if isinstance(command, bytes): return eval(command % (data), globals(), locals())
@@ -92,19 +86,3 @@ def _iEval(library: str|bytes, command: str|bytes, data:bytes) -> Any:
         elif command == b'tsv': return [_.strip().decode('utf-8') for _ in data.split(b'\t') if _]
         else: return [_.strip().decode('utf-8') for _ in data.split(b' ') if _]
     else: return data.decode('utf-8')
-    
-# Exported Functions  ======================================|
-def loads(o:str|Path, /, freeze:bool=True) -> frozendict[str,Any]|dict[str,Any]: #type:ignore
-    _ret = {}
-    for _type, _name, _class, _data in _iChain(o):
-        _ret.setdefault(_class, dict()) #type:ignore
-        _ret[_class][_name] = _iEval(*_iTypeLibraryDispatch(_type), _data)
-    else:
-        if '' in _ret: _ret.update(_ret.pop('')) #type:ignore
-    return frozendict(_ret) if freeze else _ret #type:ignore
-
-def loadsiter(o:str|Path, /, keys:bool=True, freeze:bool=False) -> Generator[Any]|Iterator[Any]:
-    return (iter if freeze else lambda x:x)((_class, _name, _iEval(*_iTypeLibraryDispatch(_type), _data)) if keys else _iEval(*_iTypeLibraryDispatch(_type), _data) for _type, _name, _class, _data in _iChain(o)) #type:ignore
-
-def loadsarray(o:str|Path, /, freeze:bool=True) -> tuple[Any]|list[Any]:
-    return (tuple if freeze else list)(_iEval(*_iTypeLibraryDispatch(_type), _data) for _type, *_, _data in _iChain(o))
