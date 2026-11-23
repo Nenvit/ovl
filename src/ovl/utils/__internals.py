@@ -1,10 +1,10 @@
 from pathlib import Path
-from re import compile, Pattern
+from re import compile, Pattern, split
 from typing import Literal, Generator, Any, Iterable, Callable, Iterator #type:ignore
 import os
 # Global Constants ===========|
 ACCEPTED_OVL_SUFFIXES = (".ovl", ".conf")
-META_REGEXP = compile(rb"^\w+\]\s[\w]+(\$[\w]+(?:\.[\w]+)*)?:\s")
+META_REGEXP = compile(rb"^\w+\][ \t]{1,3}[\w]+ {0,3}(\$ ?[\w]+(?: ?\.[\w]+)*)? {0,3}:[\s]{0,3}")
 class BOOLEAN_TRANSLATION_MAP:
     FALSE = {
             b'no', b'false', b'f', b'n',
@@ -94,19 +94,20 @@ def _ihBlobber(stream:Generator[bytes], /) -> Generator[bytes]:
     """Cleans up the blobbing from the `_ihGenerateSrc`."""
     BUF = bytearray()
     for chunk in stream:
-        if META_REGEXP.match(chunk) and BUF: yield bytes(BUF); del BUF[:]
+        if META_REGEXP.match(chunk) and META_REGEXP.match(BUF): yield bytes(BUF); del BUF[:] #Necessary not to feed junk
         elif chunk.startswith(b'...'): continue
         BUF.extend(chunk)
     else:
-        if META_REGEXP.match(BUF): yield bytes(BUF); del BUF[:]
+        if META_REGEXP.match(BUF): yield bytes(BUF); del BUF[:] #Necessary to ensure no junk
 
 def _ihMeta(stream:Generator[bytes], /) -> Generator[tuple[bytes, bytes, bytes, bytes]]:
     for blob in stream:
-        _meta, _blob = blob.split(b': ', 1)
-        _blob = _blob.rstrip(b'\r\n')
-        _type, _meta = _meta.split(b'] ', 1)
-        _name, _class = (*_meta.split(b'$', 1), b'')[:2]
-        yield _type, _name, _class, _blob
+        _meta, _blob = split(rb" ?:[\s]{0,3}", blob.rstrip(b'\r\n'), maxsplit=1)
+        _type, _meta = split(rb"\][ \t]{1,3}", _meta, maxsplit=1)
+        _name, *_class = split(rb" {0,3}\$ ?", _meta, maxsplit=1)
+        yield _type, _name, _class[0] if _class else b'', _blob
+
+    
 
 def _ipDeliminatedValueParserFactory(o: bytes) -> Callable[[bytes], Iterable[str|int]]:
     lDeliminator: Pattern[str] = compile('')
@@ -134,8 +135,7 @@ def InternalPlumbing(o: str|Path) -> Generator[tuple[bytes, bytes, bytes, bytes]
 
 def TypeLibraryDispatch(o:bytes, /) -> tuple[Callable[..., Any], bool]:
     """Maps the object type to a standard library, and the method used."""
-    o = o.lower()
-    match(o):
+    match(o.lower()):
         case b'html'|b'html5'|b'htm': return __import__('html5lib').parse, True
         case b'path': return  __import__('pathlib').Path, True #Pathlib is already imported.
         case b'url'| b'email'| b'card'| b'uuid' | b'iban': return  (lambda x: x if getattr(__import__('validators'), o.decode())(x) else None), True # type:ignore
@@ -162,33 +162,39 @@ def Eval(library: Callable[[bytes|str], Any], toString: bool, data:bytes) -> Any
 
 def ClassFactory(Root: DictLike= {}):
     if not isinstance(Root, (dict)): raise TypeError(F"IncorrectDatatype: {type(Root)}") #type:ignore
-    ClassCounterDatabase:DictLike = {} #Intentionally Flat because this is a table.
+    ClassCounterDatabase:dict[tuple[str], int] = {} #Intentionally Flat because this is a table.
+    if isinstance(Root, frozendict): Root = dict(Root)
     Node = Root
-    _LastClass = ''
-    def _lCounter(_cls: str) -> int:
+    ClassPath: tuple[str] = '',
+    def _lCounter(_cls: tuple[str]) -> int:
         ClassCounterDatabase.setdefault(_cls, -1)
         ClassCounterDatabase[_cls] += 1
         return (ClassCounterDatabase[_cls])
-    def _lWalkObject(_cls:Iterable[str|int]) -> DictLike:
+    def _lResolveClassPath(path:str) -> bool:
+        """Exists incase I add more abhorent, whitespace relevant rules to the syntax, idk, like context or something."""
+        nonlocal ClassPath
+        _path:tuple[str] = *split(r' ?\.', path), #type:ignore
+        if _path == ClassPath: return False
+        elif _path[0]: ClassPath = _path
+        else: ClassPath = '',
+        return True
+    def _lWalkObject() -> DictLike:
         """Recurses through the local `_Object` to get to a specific node. Returns the last legal node."""
-        nonlocal Node; Node = Root
-        for subnode in _cls: 
+        nonlocal Node, ClassPath, Root; Node=Root
+        for subnode in ClassPath: 
             if subnode in Node: Node = Node[subnode]
-            else: Node.setdefault(subnode, dict()); Node = Node[subnode]
+            elif subnode: Node.setdefault(subnode, dict()); Node = Node[subnode] #type:ignore
         else: return Node
     def _lRegisterSubClass(_cls: str) -> None: 
-        nonlocal _LastClass
-        if _cls == _LastClass: return
-        _ = _cls.split('.')
-        _lWalkObject(_) #type:ignore
-        _LastClass = _cls
+        if not _lResolveClassPath(_cls): return
+        _lWalkObject() #type:ignore
+        
     def _lRegisterItemName(_name: bytes) -> str|int:
-        nonlocal _LastClass; return _lCounter(_LastClass) if _name == b'nil' else _name.decode()
+        nonlocal ClassPath; return _lCounter(ClassPath) if _name == b'nil' else _name.decode()
     def _lConstruct(o: Generator[tuple[bytes, bytes, bytes, bytes]]) -> Literal[True]:
         nonlocal Node
         for _type, _name, _class, _data in o:
             _lRegisterSubClass(_class.decode())
-            _name = _lRegisterItemName(_name)
-            Node[_name] = Eval(*TypeLibraryDispatch(_type), _data)
+            Node[_lRegisterItemName(_name)] = Eval(*TypeLibraryDispatch(_type), _data) #type:ignore
         return True
     return Root, _lConstruct
