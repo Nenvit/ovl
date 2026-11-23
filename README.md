@@ -1,116 +1,263 @@
 # OVL Standard Loader
 
-OVL Standard Loader reads OVL-style text files and converts typed values into
-Python objects. The main implementation is available as `ovl.loads`; a second,
-older implementation is available as `ovl.golf_ovl.loads` and through the
-compatibility import `golf_ovl`.
+OVL Standard Loader reads typed, structured configuration files and converts
+their values into Python objects. The package exposes mapping, array, and
+iterator APIs while preserving a small, dependency-focused surface.
 
-## Requirements
+**Current release:** `1.0.1`
 
-- Python 3.15 or newer.
-- The runtime packages listed in `pyproject.toml`:
-  - `boolean-parser` (imported as `boolean_parser`) for boolean values.
-  - `frozendict` for immutable mapping results.
-  - `html5lib` for HTML values.
-  - `Markdown` (imported as `markdown`) for Markdown values.
-  - `python-dateutil` (imported as `dateutil`) for date and time values.
-  - `PyYAML` (imported as `yaml`) for YAML values.
-  - `validators` for URL, email, network address, and identifier validation.
+## Installation
 
-The standard-library modules used by the loaders include `pathlib`, `re`,
-`typing`, `os`, `json`, `pickle`, and `tomllib`. In particular, `tomllib` is
-included with Python 3.11 and later, so it does not need a separate package.
+### Requirements
 
-## Install
+- Python 3.15 or newer
+- The runtime dependencies declared in `pyproject.toml`
 
-Install the project from a checkout:
+The current runtime dependencies are `html5lib`, `Markdown`, `python-dateutil`,
+`PyYAML`, and `validators`.
+
+On Python 3.15, immutable mappings are provided by the standard-library
+`frozendict` implementation and do not require a separate package.
+
+### From a source checkout
 
 ```console
 python -m pip install .
 ```
 
-For development, install it in editable mode:
+### For development
 
 ```console
 python -m pip install -e .
 ```
 
-The project uses a PEP 517 `pyproject.toml` build configuration and a `src/`
-package layout. The distribution name is `ovl-standard-loader`; the primary
-Python import name is `ovl`.
+The distribution is published as `ovl-standard-loader`; the import package is
+`ovl`.
 
-## Quick start
+## Quick Start
+
+Load an OVL file into an immutable mapping:
 
 ```python
 from ovl import loads
 
-values = loads("settings.ovl")
+settings = loads("settings.ovl")
 ```
 
-`loads(path)` accepts a string or `pathlib.Path`. The main implementation
-accepts files with these suffixes: `.ovl`, `.oval`, `.oconf`, `.ov`, `.conf`,
-and `.ovlconf`. It returns an immutable `frozendict`, grouped by the class
-portion of each entry. In the current parser, separate the key and class with
-`$`; records with an empty class (a trailing `$`) are merged into the top
-level of the result.
-
-To request the older implementation instead:
+To receive a mutable dictionary, disable freezing:
 
 ```python
-from golf_ovl import loads
-
-values = loads("settings.ovl")
+settings = loads("settings.ovl", freeze=False)
 ```
 
-The older loader accepts only `.ovl` files. Its parsing and supported type
-conversions differ from the main `ovl.loads` implementation; prefer the main
-implementation for new code.
+An existing dictionary can be supplied as the initial mapping:
 
-## File format
+```python
+settings = loads(
+    "settings.ovl",
+    update={"environment": "development"},
+)
+```
 
-The main loader recognizes metadata records shaped like:
+## Public API
+
+### `loads(path, update={}, freeze=True)`
+
+Loads a file into a nested mapping. The `path` argument accepts both a string
+and a `pathlib.Path`.
+
+Classes form nested mappings. Dot notation can be used to create additional
+levels:
 
 ```text
-type] key$class: value
+int] retries$network.timeout: 3
 ```
 
-The `$class` portion identifies the result group. For example:
+Set `freeze=False` to return a mutable dictionary. The `update` argument
+provides values that are present before the file is processed.
+
+### `loadsarray(path, freeze=True)`
+
+Returns values in file order as a tuple by default:
+
+```python
+from ovl import loadsarray
+
+values = loadsarray("settings.ovl")
+```
+
+Pass `freeze=False` to return a list instead.
+
+### `loadsiter(path, keys=True, freeze=False)`
+
+Returns an iterator over parsed records:
+
+```python
+from ovl import loadsiter
+
+for value in loadsiter("settings.ovl"):
+    print(value)
+```
+
+With `keys=True`, the iterator yields `(class, name, value)` tuples:
+
+```python
+for value_class, name, value in loadsiter("settings.ovl", keys=True):
+    print(value_class, name, value)
+```
+
+## File Format
+
+Each value-bearing record must use the strict metadata syntax below:
+
+```text
+type] name$class.subclass.es: data
+```
+For Example:
 
 ```text
 int] retries$network: 3
-csv] formats$display: json,xml
-... continuation lines are ignored by the loader
+csv] formats$display.colors: json,xml
 ```
 
-The main implementation's dispatch table recognizes labels such as `html`,
-`json`, `yaml`, `pckl`/`pkl`, `md`,
-`url`, `email`, `ipv4`, `ipv6`, `mac`, `date`, `time`, `datetime`/`dt`,
-`bool`, `int`, `float`, `complex`/`cplx`, `path`, `blob`, `csv`, `tsv`, and
-`toml`. Unrecognized types are returned as text. The two implementations have
-different conversion paths; verify the specific conversions your application
-uses rather than assuming they behave identically.
+Any line that does not match the strict metadata syntax is not parsed as a
+separate value. Instead, it is appended to the buffered content of the preceding
+record. It can therefore build a multiline value, but it can also alter or
+corrupt the preceding value if inserted accidentally.
 
-Only load OVL files from trusted sources. Some typed-value conversions
-evaluate generated Python expressions, so untrusted input is not safe to
-process.
+```text
+yaml] server$config: host: localhost
+port: 8080
+```
 
-## Package layout
+In this example, `host: localhost` and `port: 8080` do not match the strict
+record syntax, so they become part of the YAML value.
+
+Lines beginning with `...` are comments. They are ignored by the parser rather
+than appended to the buffer or interpreted as data.
+
+A record is also technically acceptable when the metadata is followed only by
+a colon and newline, with the value on the following line:
+
+```ovl
+type] name$class.es:
+data
+```
+
+For example:
+
+```ovl
+int] port$networks.servers.server0:
+8080
+```
+
+The loader does not perform fallback parsing for malformed metadata. Use exact
+`] ` and `: ` delimiters, word-character names and class segments, and dots only
+between class or subclass names.
+
+The loader accepts:
+
+- `.ovl`
+- `.conf`
+
+Metadata and values are read as bytes, then converted according to the type
+label.
+
+## Supported Value Types
+
+| Label | Result |
+| --- | --- |
+| `html`, `html5`, `htm` | HTML5 document |
+| `json` | JSON value |
+| `yaml` | YAML value |
+| `md` | Markdown-rendered text |
+| `path` | `pathlib.Path` |
+| `url`, `email`, `card`, `uuid`, `iban` | Validated value |
+| `ipv4`, `ipv6`, `mac` | Validated network value |
+| `cusip`, `isin`, `sedol` | Validated financial identifier |
+| `blob` | UTF-8 bytes |
+| `csv`, `tsv`, `wsv`, `lsv` | Delimited list |
+| `int`, `float` | Numeric value |
+| `cplx`, `complex`, `imag` | Complex numeric value |
+| `bool` | Boolean or `None`; parsed by the built-in boolean parser |
+| `date`, `time`, `datetime`, `dt` | Date, time, or datetime value |
+| `toml` | TOML value |
+
+Unknown type labels are decoded as text. A name of `nil` assigns an automatic
+numeric index within the active class.
+
+## Boolean Parsing
+
+Boolean values use the native `_ipBooleanParser` implementation in
+[`__internals.py`](./src/ovl/utils/__internals.py). Parsing is case-insensitive
+and ignores surrounding whitespace.
+
+```text
+bool] enabled: yes
+bool] fallback: no
+bool] unknown: maybe
+```
+
+Recognized true values include `yes`, `y`, `true`, `t`, `on`, `enabled`,
+`1`, and `ofc`. Recognized false values include `no`, `n`, `false`, `f`,
+`off`, `0`, `disabled`, and `negative`.
+
+The parser also recognizes selected English phrases, including
+`thanks, but no thanks`, and multilingual equivalents such as `oui`, `ja`,
+`да`, `нет`, `ложь`, `faux`, and `nein`. Any value outside these translation
+maps returns `None`.
+
+The translation tables are an intentional part of OVL's public boolean format.
+They are maintained in
+[`BOOLEAN_TRANSLATION_MAP`](./src/ovl/utils/__internals.py). The false-value
+collection includes a "99 ways to say No" reference, attributed in source
+comments to
+[LinkedIn's 99 ways to say no article](https://www.linkedin.com/pulse/20130501190655-52397036-100-ways-to-say-no).
+Individual phrases originate from that reference or from the project's own
+examples and modifications.
+
+## Version Information
+
+The `VERSION` file is maintained primarily for internal version control as part
+of the author's proprietary standard library. That standard-library API is not
+currently offered as a public interface and may remain unavailable or change
+without notice for an indeterminate period.
+
+For public package information, use `pyproject.toml`, this README, package
+metadata, and installed-package metadata instead. The package's authoritative
+release and compatibility information is declared in `pyproject.toml`; details
+in `VERSION` should not be assumed to represent a public API or format
+guarantee. The binary format may change in the future, while the public sources
+remain the reference for users.
+
+## Package Layout
 
 ```text
 pyproject.toml
 src/
-  golf_ovl.py          # compatibility import
   ovl/
-    __init__.py        # main implementation; exports loads
-    golf_ovl.py        # older implementation
+    __init__.py        # Public exports
+    utils/
+      __internals.py   # Parser and conversion internals
+      loaders.py       # Public loader functions
 ```
 
-## Development and build
+## Development
 
-Build a wheel without installing the project:
+Run the automated test suite from the repository root:
+
+```console
+python -m unittest discover -s tests -v
+```
+
+Build a wheel without installing the package:
 
 ```console
 python -m pip wheel --no-deps .
 ```
 
-There is currently no automated test suite in the repository.
+Build a source distribution and wheel:
+
+```console
+python -m build
+```

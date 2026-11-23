@@ -1,0 +1,31 @@
+...Returns Objects
+str] description$html: HTML or HTML-like examples.
+html] nil$html.examples: <p class='examples'> Good HTML Element Example. </p>
+htm] nil$html.examples: <i> Italic <br/></i>
+html5] nil$html.examples: <bold> Bad Example.
+path] nil$Paths: ./dev.ovl
+json] json_object: {"dev":0.1, "version": 0.2}
+yaml] yaml_object: 
+config:
+    - no: 'Nein'
+blob] blob: 'hello'
+csv] csv: I, me, mysel, moi
+tsv] tsv: luxurious bourgeois   beans
+wsv] wsv: I tell you what!
+md] md: # I will *not* fold!
+cplx] cplx: 1+0j
+int] int: 1
+float] float: 1.0
+bool] boolean: y
+date] date: March 27, 2007
+time] time: 00:00
+dt] datetime: March 27, 2007 12:00AM
+toml] toml: 
+[Unit]
+feet=1
+inches=12
+url] url: https://google.com
+email] email: nenvitcodes@gmail.com
+text] nil: 
+Obscure text
+... Ignored (hopefully.)
