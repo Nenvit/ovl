@@ -31,8 +31,8 @@ phrases.
 
 ## Adding Hierarchical Behavior
 
-Prefer tests before changing `_lRegisterSubClass`, `_lWalkObject`, `_lCounter`,
-or `_LastClass`. Those functions interact through mutable closure state.
+Prefer tests before changing `_lResolveClassPath`, `_lWalkObject`, `_lCounter`,
+or `ClassPath`. Those functions interact through mutable closure state.
 
 At minimum, test:
 
@@ -46,6 +46,7 @@ At minimum, test:
 
 ## Adding Multiline Parsing
 
-The strict metadata regex, `_ihBlobber`, `_ihMeta`, and dispatch must be tested
-together. A change to one delimiter or line boundary can alter `: ` splitting,
-CRLF handling, comments, or data buffering.
+The whitespace-permissive metadata regex, `_ihBlobber`, `_ihMeta`, class
+normalization, and dispatch must be tested together. A change to one delimiter
+or line boundary can alter whitespace stripping, CRLF handling, comments,
+buffer transitions, or data buffering.

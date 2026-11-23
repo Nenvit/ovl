@@ -23,7 +23,7 @@ Future maintainers should preserve:
 - simplicity over cleverness;
 - explicit behavior over inference;
 - narrow solutions over generalized frameworks;
-- strict parsing;
+- whitespace-permissive but strict metadata matching;
 - explicit type handling;
 - known-type dispatch;
 - hierarchical object construction;

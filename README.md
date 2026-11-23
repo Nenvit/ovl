@@ -108,16 +108,23 @@ for value_class, name, value in loadsiter("settings.ovl", keys=True):
 
 ## File Format
 
-Each value-bearing record must use the strict metadata syntax below:
+Value-bearing records use the metadata form below:
 
 ```text
 type] name$class.subclass.es: data
 ```
-For Example:
+
+The parser accepts limited whitespace variation. `]` may be followed by one to
+three spaces or tabs, while class and colon regions may contain up to three
+spaces. The colon may be followed by zero to three whitespace characters.
+
+Examples include:
 
 ```text
 int] retries$network: 3
 csv] formats$display.colors: json,xml
+int]\tport $ networks .servers.server0 :   8080
+int]   port   $ networks.servers: 8080
 ```
 
 Any line that does not match the strict metadata syntax is not parsed as a
@@ -151,9 +158,19 @@ int] port$networks.servers.server0:
 8080
 ```
 
-The loader does not perform fallback parsing for malformed metadata. Use exact
-`] ` and `: ` delimiters, word-character names and class segments, and dots only
-between class or subclass names.
+The loader does not perform fallback parsing for malformed metadata. The
+matching and splitting rules are:
+
+- type: one or more `\w` characters;
+- after `]`: one to three spaces or tabs;
+- name: one or more `\w` characters;
+- class: optional, beginning with `$`, with optional spaces around `$` and dots;
+- class segments: one or more `\w` characters;
+- before the colon: zero to three spaces;
+- after the colon: zero to three whitespace characters.
+
+Additional characters outside these ranges can prevent a line from matching
+and may cause it to be buffered with the preceding value.
 
 The loader accepts:
 
@@ -188,7 +205,7 @@ numeric index within the active class.
 
 ## Boolean Parsing
 
-Boolean values use the native `_ipBooleanParser` implementation in
+Boolean values use the native `BooleanParser` implementation in
 [`__internals.py`](./src/ovl/utils/__internals.py). Parsing is case-insensitive
 and ignores surrounding whitespace.
 

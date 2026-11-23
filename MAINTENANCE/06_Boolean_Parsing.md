@@ -23,7 +23,7 @@ and multilingual values.
 
 ## Unknown Values
 
-Unknown boolean values return `None`; `_ipBooleanParser`/`BooleanParser` does
+Unknown boolean values return `None`; `BooleanParser` does
 not raise for an unrecognized spelling. This makes the parser explicit rather
 than defaulting unknown input to false.
 

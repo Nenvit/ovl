@@ -17,18 +17,24 @@ be disabled with optimized interpreter settings. The function already raises
 its own validation exceptions, so this assertion wrapper is not the validation
 mechanism and may be unclear to maintainers.
 
-## CRLF and Exact Delimiters
+## Whitespace, CRLF, and Split Rules
 
 The parser operates in binary mode and trims trailing CR/LF in `_ihMeta`.
-Exact `': '` and `'] '` delimiters are required in metadata blobs. Text-format
-expectations and line-ending behavior need tests for Windows CRLF and newline
-values.
+`META_REGEXP` permits bounded spaces/tabs, and `_ihMeta` uses separate split
+patterns rather than fixed `': '` and `'] '` delimiters. The implementation
+does not permit arbitrary whitespace; maintainers should test the exact regexp
+limits and line-ending behavior.
 
 ## Parser Malformed-Line Behavior
 
 Every non-comment, non-matching line is appended to the buffer. It is therefore
 capable of multiline values but has no separate malformed-line error mode.
 Malformed metadata can silently alter or corrupt the previous value.
+
+The updated `_ihBlobber` also requires both the incoming chunk and the existing
+buffer to match `META_REGEXP` before flushing the buffer. This stricter
+two-sided condition is central to buffer behavior and should be tested with
+consecutive whitespace variants.
 
 ## Coverage Gaps
 

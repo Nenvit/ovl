@@ -20,12 +20,12 @@ The active suffix tuple is `.ovl` and `.conf`. `_ihAssert` raises
 Keeping source bytes in the pipeline avoids implicit text decoding until a
 known conversion dispatch is selected.
 
-## Strict Metadata Recognition
+## Whitespace-Permissive Metadata Recognition
 
 `META_REGEXP` is:
 
 ```python
-rb"^\w+\]\s[\w]+(\$[\w]+(?:\.[\w]+)*)?:\s"
+rb"^\w+\][ \t]{1,3}[\w]+ {0,3}(\$ ?[\w]+(?: ?\.[\w]+)*)? {0,3}:[\s]{0,3}"
 ```
 
 It recognizes a record beginning with:
@@ -34,15 +34,28 @@ It recognizes a record beginning with:
 type] name$class.subclass:
 ```
 
-In the implementation, `\w+` covers the type and name portions, `$` starts an
-optional class, and dots separate class segments. The final separator is
-captured as whitespace or newline.
+The active limits are:
+
+- `]` is followed by one to three spaces or tabs;
+- the name may have zero to three spaces before an optional `$`;
+- `$` may have one optional space after it;
+- dotted class segments may have one optional space before or after dots;
+- zero to three spaces may precede the colon;
+- zero to three whitespace characters may follow the colon.
+
+These are the exact source limits. They do not permit arbitrary indentation,
+arbitrary tab counts, or arbitrary spaces around every separator.
 
 ## Buffering
 
-`_ihBlobber` accumulates bytes until it encounters another matching metadata
-line. A matching line flushes the previous buffer. Lines beginning with `...`
-are skipped as comments.
+`_ihBlobber` accumulates bytes until it encounters a chunk that:
+
+1. matches `META_REGEXP`; and
+2. is followed while the existing buffer also matches `META_REGEXP`.
+
+Under the current implementation, a matching chunk flushes the previous
+buffer only when both conditions hold. Lines beginning with `...` are skipped
+as comments.
 
 Malformed or non-metadata lines are appended to the current buffer. Therefore
 they can form multiline values. They can also corrupt the preceding value when
@@ -53,7 +66,7 @@ metadata inference without a broad compatibility assessment.
 
 ## Inline and Newline Values
 
-The same metadata line may contain data after `: `:
+The same metadata line may contain data after the colon:
 
 ```text
 int] port$networks.servers.server0: 8080
@@ -67,17 +80,28 @@ int] port$networks.servers.server0:
 8080
 ```
 
-`_ihMeta` splits each buffered record on `': '` and is therefore sensitive to
-that exact byte delimiter.
+`_ihMeta` uses the following regular-expression splits:
+
+```python
+rb" ?:[\s]{0,3}"
+rb"\][ \t]{1,3}"
+rb" {0,3}\$ ?"
+rb" ?\."
+```
+
+The split behavior removes permitted surrounding spaces in metadata and
+normalizes dot-separated class segments. The active implementation does not
+use fixed `: ` and `] ` values as its metadata split contract.
 
 ## Metadata Split
 
 After a complete blob is produced, `_ihMeta`:
 
-1. splits metadata and data at `b': '`;
-2. splits type and metadata at `b'] '`;
-3. splits name and class at `$`;
-4. yields `_type`, `_name`, `_class`, and `_blob`.
+1. splits metadata and data with `rb" ?:[\s]{0,3}"`;
+2. splits type and metadata with `rb"\][ \t]{1,3}"`;
+3. splits name and class with `rb" {0,3}\$ ?"`;
+4. normalizes dot-separated class segments with `rb" ?\."`;
+5. yields `_type`, `_name`, `_class`, and `_blob`.
 
 The data portion is stripped of trailing CR/LF bytes.
 

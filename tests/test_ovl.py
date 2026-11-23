@@ -27,6 +27,31 @@ class OVLTestCase(unittest.TestCase):
 
 
 class PublicLoaderTests(OVLTestCase):
+    def test_permissive_metadata_whitespace(self) -> None:
+        path = self.write_ovl(
+            "int]\tport $ networks .servers.server0 :\t8080\n"
+        )
+
+        result = loads(path, freeze=False)
+
+        self.assertEqual(
+            result["networks"]["servers"]["server0"]["port"],
+            8080,
+        )
+
+    def test_newline_separated_value_with_whitespace(self) -> None:
+        path = self.write_ovl(
+            "int] port $ networks .servers.server0 :\n"
+            "8080\n"
+        )
+
+        result = loads(path, freeze=False)
+
+        self.assertEqual(
+            result["networks"]["servers"]["server0"]["port"],
+            8080,
+        )
+
     def test_loads_returns_frozen_mapping_by_default(self) -> None:
         path = self.write_ovl("int] retries$network: 3\n")
 

@@ -15,19 +15,20 @@
 
 - `Root`, the initial root dictionary;
 - `Node`, the current nested dictionary;
-- `_LastClass`, the previously active class;
-- `ClassCounterDatabase`, counters for `nil` names.
+- `ClassPath`, the normalized tuple of active class segments;
+- `ClassCounterDatabase`, counters keyed by class path for `nil` names.
+
+If `Root` is already a `frozendict`, `ClassFactory` converts it to `dict`
+before construction.
 
 The returned constructor processes records from `InternalPlumbing`.
 
 ## Class Changes
 
-When `_lRegisterSubClass` sees a new class, it splits the class at dots and
-walks or creates nested dictionaries in `Root`.
-
-The implementation intentionally retains the last registered class. Consecutive
-records with the same class reuse `Node`; a class change recreates the current
-walk position.
+`_lResolveClassPath` normalizes the class string by splitting it on optional
+spaces around dots. `_lResolveClassPath` compares the resulting tuple with
+`ClassPath`; equal paths do not trigger a walk. A new path is resolved through
+`_lWalkObject`, which starts from `Root` and creates or walks each segment.
 
 ## Item Names
 

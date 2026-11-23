@@ -27,7 +27,10 @@ The suite is organized into:
 
 Tests cover frozen and mutable `loads`, update dictionaries, nested classes,
 `loadsarray` tuple/list behavior, keyed and value-only iteration, `nil`
-indexes, comments, suffixes, and path exceptions.
+indexes, comments, suffixes, whitespace-permissive inline metadata, and
+newline-separated values with whitespace.
+
+The expanded suite contains 19 tests.
 
 ## Conversion Coverage
 
