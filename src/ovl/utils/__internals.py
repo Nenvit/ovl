@@ -4,7 +4,7 @@ from typing import Literal, Generator, Any, Iterable, Callable, Iterator #type:i
 import os
 # Global Constants ===========|
 ACCEPTED_OVL_SUFFIXES = (".ovl", ".conf")
-META_REGEXP = compile(rb"^\w+\][ \t]{1,3}[\w]+ {0,3}(\$ ?[\w]+(?: ?\.[\w]+)*)? {0,3}:[\s]{0,3}")
+META_REGEXP = compile(rb"^\w+\][ \t]{1,3}[\w]+ {0,3}(\$ ?(\w+|(\[\w+([:-](\w+|([1-9][0-9]*))?\]))(?: ?\.[\w]+)*)? {0,3}:[\s]{0,3}")
 class BOOLEAN_TRANSLATION_MAP:
     FALSE = {
             b'no', b'false', b'f', b'n',
@@ -64,7 +64,7 @@ class BOOLEAN_TRANSLATION_MAP:
             b'i don\'t have an iota of bandwidth left in my brain.', b'if only.', b'n to the o.', b'no.'
             }
     TRUE = {
-        b'yes', b'cool beans', b'y', b'enabled', b'yea', b'yay', b'moi? j\'eccepte.', b'oui', b'ouais', b'1', b'i',
+        b'yes', b'cool beans', b'y', b'enabled', b'yea', b'yay', b'moi? j\'eccepte.', b'oui', b'ouais', b'1',
         b'on', 'allumé'.encode(), b'true', b't', b'ofc', b'mhm', b'ok', b'ja', "да".encode(), "Правда".encode(), "П".encode(), "д".encode()
     }
 
@@ -163,21 +163,42 @@ def Eval(library: Callable[[bytes|str], Any], toString: bool, data:bytes) -> Any
 def ClassFactory(Root: DictLike= {}):
     if not isinstance(Root, (dict)): raise TypeError(F"IncorrectDatatype: {type(Root)}") #type:ignore
     ClassCounterDatabase:dict[tuple[str], int] = {} #Intentionally Flat because this is a table.
+    ItemNameDatabase: dict[str, tuple[str]] = {}
     if isinstance(Root, frozendict): Root = dict(Root)
     Node = Root
     ClassPath: tuple[str] = '',
-    def _lCounter(_cls: tuple[str]) -> int:
-        ClassCounterDatabase.setdefault(_cls, -1)
-        ClassCounterDatabase[_cls] += 1
-        return (ClassCounterDatabase[_cls])
-    def _lResolveClassPath(path:str) -> bool:
-        """Exists incase I add more abhorent, whitespace relevant rules to the syntax, idk, like context or something."""
+    def _lCount() -> int:
         nonlocal ClassPath
+        ClassCounterDatabase.setdefault(ClassPath, -1)
+        ClassCounterDatabase[ClassPath] += 1
+        return (ClassCounterDatabase[ClassPath])
+    
+    def _lResolveClassPath(path:str) -> tuple[str]:
+        """Exists incase I add more abhorent, whitespace relevant rules to the syntax, idk, like context or something."""
         _path:tuple[str] = *split(r' ?\.', path), #type:ignore
+        if '[' in _path[0]:
+            try:
+                _neg = '-' in _path[0]
+                _name, *_splice = split('[:-]', _path[0][1:-1], maxsplit=1)
+                _dbPath = ClassPath if _name=='nil' else ItemNameDatabase.get(_name, tuple())
+                if _splice:
+                    _splice = slice(0, -int(_splice[0]) if _neg else int(_splice[0])+1) \
+                                if _splice[0].isnumeric() \
+                                else slice(0, -_dbPath.index(_splice[0]) if _neg else _dbPath.index(_splice[0]) + 1)
+                    _path = _dbPath[_splice] + _path[1:] #type:ignore
+                else: 
+                    _path = _dbPath + _path[1:] #type:ignore
+            except: _path = '',
+        return _path
+    
+    def _lSetClassPath(_path:tuple[str]) -> bool:
+        """Attempts to set the class path."""
+        nonlocal ClassPath
         if _path == ClassPath: return False
         elif _path[0]: ClassPath = _path
         else: ClassPath = '',
         return True
+    
     def _lWalkObject() -> DictLike:
         """Recurses through the local `_Object` to get to a specific node. Returns the last legal node."""
         nonlocal Node, ClassPath, Root; Node=Root
@@ -185,16 +206,17 @@ def ClassFactory(Root: DictLike= {}):
             if subnode in Node: Node = Node[subnode]
             elif subnode: Node.setdefault(subnode, dict()); Node = Node[subnode] #type:ignore
         else: return Node
-    def _lRegisterSubClass(_cls: str) -> None: 
-        if not _lResolveClassPath(_cls): return
-        _lWalkObject() #type:ignore
-        
-    def _lRegisterItemName(_name: bytes) -> str|int:
-        nonlocal ClassPath; return _lCounter(ClassPath) if _name == b'nil' else _name.decode()
+    
+    def _lResolveItemName(_name: bytes) -> str|int:
+        return _lCount() if _name == b'nil' else _name.decode()
+    
     def _lConstruct(o: Generator[tuple[bytes, bytes, bytes, bytes]]) -> Literal[True]:
         nonlocal Node
         for _type, _name, _class, _data in o:
-            _lRegisterSubClass(_class.decode())
-            Node[_lRegisterItemName(_name)] = Eval(*TypeLibraryDispatch(_type), _data) #type:ignore
+            _class = _lResolveClassPath(_class.decode())
+            _name  = _lResolveItemName(_name)
+            if _lSetClassPath(_class): _lWalkObject() #type:ignore
+            if isinstance(_name, str): ItemNameDatabase.setdefault(_name, _class)
+            Node[_name] = Eval(*TypeLibraryDispatch(_type), _data) #type:ignore
         return True
     return Root, _lConstruct
