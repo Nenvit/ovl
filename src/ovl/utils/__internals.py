@@ -4,7 +4,7 @@ from typing import Literal, Generator, Any, Iterable, Callable, Iterator #type:i
 import os
 # Global Constants ===========|
 ACCEPTED_OVL_SUFFIXES = (".ovl", ".conf")
-META_REGEXP = compile(rb"^\w+\][ \t]{1,3}[\w]+ {0,3}(\$ ?(\w+|(\[\w+([:-](\w+|([1-9][0-9]*))?\]))(?: ?\.[\w]+)*)? {0,3}:[\s]{0,3}")
+META_REGEXP = compile(rb"^\w+\][ \t]{1,3}[\w]+ {0,3}(\$ ?(\w+|(\[\w+([;-](\w+|([1-9][0-9]*)))?\]))(?: ?\.[\w]+)*)? {0,3}:[\s]{0,3}")
 class BOOLEAN_TRANSLATION_MAP:
     FALSE = {
             b'no', b'false', b'f', b'n',
@@ -105,9 +105,7 @@ def _ihMeta(stream:Generator[bytes], /) -> Generator[tuple[bytes, bytes, bytes, 
         _meta, _blob = split(rb" ?:[\s]{0,3}", blob.rstrip(b'\r\n'), maxsplit=1)
         _type, _meta = split(rb"\][ \t]{1,3}", _meta, maxsplit=1)
         _name, *_class = split(rb" {0,3}\$ ?", _meta, maxsplit=1)
-        yield _type, _name, _class[0] if _class else b'', _blob
-
-    
+        yield _type, _name, _class[0] if _class else b'', _blob   
 
 def _ipDeliminatedValueParserFactory(o: bytes) -> Callable[[bytes], Iterable[str|int]]:
     lDeliminator: Pattern[str] = compile('')
@@ -179,7 +177,7 @@ def ClassFactory(Root: DictLike= {}):
         if '[' in _path[0]:
             try:
                 _neg = '-' in _path[0]
-                _name, *_splice = split('[:-]', _path[0][1:-1], maxsplit=1)
+                _name, *_splice = split(r'[;-]', _path[0][1:-1], maxsplit=1)
                 _dbPath = ClassPath if _name=='nil' else ItemNameDatabase.get(_name, tuple())
                 if _splice:
                     _splice = slice(0, -int(_splice[0]) if _neg else int(_splice[0])+1) \
@@ -189,7 +187,7 @@ def ClassFactory(Root: DictLike= {}):
                 else: 
                     _path = _dbPath + _path[1:] #type:ignore
             except: _path = '',
-        return _path
+        return _path if _path else '', #type:ignore
     
     def _lSetClassPath(_path:tuple[str]) -> bool:
         """Attempts to set the class path."""

@@ -44,6 +44,17 @@ At minimum, test:
 - empty classes;
 - frozen and mutable output.
 
+For class-path aliases, test:
+
+- named aliases after the item name is registered;
+- `[nil]` against the active `ClassPath`;
+- numeric and word `;suffix` positive slices;
+- numeric and word `-suffix` negative slices;
+- dotted continuation after aliases;
+- repeated item names and database replacement;
+- forward and unknown aliases;
+- tuple-key or nested-dictionary output during ordinary and alias construction.
+
 ## Adding Multiline Parsing
 
 The whitespace-permissive metadata regex, `_ihBlobber`, `_ihMeta`, class

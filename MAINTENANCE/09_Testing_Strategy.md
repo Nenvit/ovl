@@ -43,6 +43,12 @@ The suite does not currently establish behavior for every dispatch label.
 Examples omitted from dedicated tests include HTML, Markdown, URLs, network
 validators, finance identifiers, WSV/LSV, dates, and times.
 
+The suite also does not cover class-path alias registration, `[nil]`,
+positive/negative alias slices, alias continuation, forward references, or
+unknown aliases. Direct source probes reveal a current tuple-key construction
+defect that should be isolated in dedicated tests before alias behavior is
+treated as stable.
+
 The suite also does not explicitly cover every interleaving of class changes,
 mixed empty classes, repeated normal names, unknown dispatch labels, CRLF
 handling, permission failures, or malformed metadata.

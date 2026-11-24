@@ -25,7 +25,7 @@ known conversion dispatch is selected.
 `META_REGEXP` is:
 
 ```python
-rb"^\w+\][ \t]{1,3}[\w]+ {0,3}(\$ ?[\w]+(?: ?\.[\w]+)*)? {0,3}:[\s]{0,3}"
+rb"^\w+\][ \t]{1,3}[\w]+ {0,3}(\$ ?(\w+|(\[\w+([;-](\w+|([1-9][0-9]*)))?\]))(?: ?\.[\w]+)*)? {0,3}:[\s]{0,3}"
 ```
 
 It recognizes a record beginning with:
@@ -39,6 +39,9 @@ The active limits are:
 - `]` is followed by one to three spaces or tabs;
 - the name may have zero to three spaces before an optional `$`;
 - `$` may have one optional space after it;
+- the first class segment may be ordinary `\w+` text or a bracketed alias;
+- bracketed aliases support `[name]`, `[nil]`, `[name;suffix]`, and
+  `[name-suffix]`;
 - dotted class segments may have one optional space before or after dots;
 - zero to three spaces may precede the colon;
 - zero to three whitespace characters may follow the colon.
@@ -92,6 +95,11 @@ rb" ?\."
 The split behavior removes permitted surrounding spaces in metadata and
 normalizes dot-separated class segments. The active implementation does not
 use fixed `: ` and `] ` values as its metadata split contract.
+
+After `_ihMeta`, `_lResolveClassPath` performs alias resolution. It recognizes
+semicolon positive slices and hyphen negative slices using
+`split(r'[;-]', ..., maxsplit=1)`. `_ihMeta` itself does not split semicolons
+or hyphens, so these characters remain available for alias processing.
 
 ## Metadata Split
 

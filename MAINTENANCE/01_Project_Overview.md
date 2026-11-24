@@ -53,6 +53,8 @@ The recurring implementation patterns support these descriptions:
   matching.
 - **Hierarchical construction:** `$class` and dot-separated class segments
   become nested dictionaries.
+- **Class-path alias state:** `ItemNameDatabase` and `ClassPath` enable
+  sequential named and current-path alias resolution.
 - **Immutable-by-default loading:** `loads` uses `freeze=True` by default.
 
 These are observations from code and tests, not claims of a broader product

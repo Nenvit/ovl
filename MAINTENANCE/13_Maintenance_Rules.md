@@ -9,8 +9,7 @@ AI usage is limited primarily to:
 - documentation drafting;
 - README generation;
 - maintenance documentation;
-- autocomplete assistance;
-- boilerplate generation.
+- autocomplete assistance.
 
 Core architecture, parser design, loaders, dispatch systems, object
 construction, format decisions, and implementation logic should be treated as
@@ -39,6 +38,9 @@ Before a change, identify whether it touches:
 - `TypeLibraryDispatch`;
 - boolean translation;
 - `ClassFactory`;
+- `ItemNameDatabase`;
+- `ClassCounterDatabase`;
+- `_lResolveClassPath`;
 - public loader signatures;
 - `pyproject.toml`;
 - public README behavior;

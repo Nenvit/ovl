@@ -52,3 +52,21 @@ because behavior is concentrated in few functions.
 
 `pckl` and `pkl` are commented out in `TypeLibraryDispatch`. The repository
 does not establish a completed support contract for these labels.
+
+## Class-Path Aliasing
+
+`ClassFactory` now keeps `ClassPath` as tuple state and `ItemNameDatabase` as
+named-to-tuple state. Ordinary and alias classes are resolved by
+`_lResolveClassPath` before `_lSetClassPath` and `_lWalkObject`.
+
+The broad `except` in `_lResolveClassPath` hides lookup and splice failures and
+replaces the resolved path with an empty path.
+
+Forward aliases are not revisited. Unknown names and invalid suffixes do not
+produce an alias-specific exception.
+
+The latest source contains a construction inconsistency: direct probes show
+ordinary classes can be stored under tuple keys such as `('network',)` instead
+of the expected string key `network`, and alias paths can produce nested tuple
+keys. This is observable in `ClassFactory` and should be treated as a
+maintenance defect, not documented as stable nested-dictionary behavior.

@@ -76,6 +76,91 @@ int] retries$network.timeout: 3
 Set `freeze=False` to return a mutable dictionary. The `update` argument
 provides values that are present before the file is processed.
 
+## Class-Path Aliases
+
+The first class segment may reference another record's resolved class path.
+The bracketed forms implemented by `__internals.py` are:
+
+```text
+[name]
+[nil]
+[name;suffix]
+[name-suffix]
+```
+
+### Named aliases
+
+`ItemNameDatabase` records the resolved class tuple for normal string item names.
+A later bracketed alias can copy that tuple:
+
+```text
+int] primary$network.servers.primary: 8080
+int] port$[primary]: 8081
+```
+
+Aliases are resolved sequentially. `[primary]` can refer to `primary` only after
+the earlier record has been processed and has registered its name. Repeated
+string item names replace the database entry with the most recent resolved
+class tuple.
+
+### `[nil]`
+
+`[nil]` does not search `ItemNameDatabase`. It resolves from `ClassPath`, the
+tuple currently active for construction:
+
+```text
+int] first$network.servers: 8080
+int] port$[nil].alternate: 8081
+```
+
+The optional dotted continuation after the bracket is appended to the resolved
+alias path.
+
+### Semicolon positive splices
+
+`[name;suffix]` selects a prefix of the referenced tuple:
+
+- a numeric suffix `N` uses `slice(0, N + 1)`;
+- a word suffix uses `slice(0, index(word) + 1)`.
+
+For example:
+
+```text
+int] port$[primary;2]: 8081
+int] port$[primary;servers]: 8081
+```
+
+These forms use a semicolon; `_ihMeta` does not split semicolons from
+metadata.
+
+### Hyphen negative splices
+
+`[name-suffix]` selects a prefix of the referenced tuple with an exclusion
+slice:
+
+- a numeric suffix `N` uses `slice(0, -N)`;
+- a word suffix uses `slice(0, -index(word))`.
+
+For example:
+
+```text
+int] port$[primary-1]: 8081
+int] port$[primary-servers]: 8081
+```
+
+The suffix is resolved from the tuple stored for `name`, or from `ClassPath`
+for `[nil-suffix]`.
+
+### Alias failure behavior
+
+Alias lookup or splice resolution is inside a broad `except` in
+`_lResolveClassPath`. Lookup failures, missing `nil` context, invalid word
+suffixes, or other splice errors fall back to an empty class path instead of
+raising an alias-specific exception.
+
+The fallback is not a later lookup pass: forward references and unknown names
+do not resolve retroactively.
+
 ### `loadsarray(path, freeze=True)`
 
 Returns values in file order as a tuple by default:

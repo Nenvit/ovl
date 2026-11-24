@@ -50,3 +50,8 @@ the same representation.
 Changes to `META_REGEXP`, `_ihBlobber`, `_ihMeta`, `TypeLibraryDispatch`, or
 `ClassFactory` can affect all three public loaders. `loaders.py` is small, while
 these internals centralize most behavior.
+
+`ClassFactory` now has an alias-sensitive state model: `ClassPath`,
+`ItemNameDatabase`, and `ClassCounterDatabase` are used before a record is
+stored. Alias changes affect `_lResolveClassPath`, `_lSetClassPath`,
+`_lWalkObject`, `_lResolveItemName`, and `_lConstruct` together.
